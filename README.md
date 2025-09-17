@@ -148,6 +148,76 @@ use_data_analysis_agent = true     # Disabled by default, change to true to acti
 ```
 In addition, you need to install the relevant dependencies to ensure the agent runs properly: [Detailed Installation Guide](app/tool/chart_visualization/README.md##Installation)
 
+## Technical Architecture
+
+For developers and system architects who want to understand the technical details of OpenManus:
+
+📚 **[Comprehensive Architecture Documentation](docs/README.md)**
+
+Key documentation includes:
+- **[System Architecture](docs/ARCHITECTURE.md)** - Complete technical overview with Mermaid diagrams
+- **[Agent Framework](docs/AGENT_FRAMEWORK.md)** - Agent system design and development guide  
+- **[Tool System](docs/TOOL_SYSTEM.md)** - Tool architecture and custom tool development
+- **[Flow Management](docs/FLOW_MANAGEMENT.md)** - Multi-agent coordination and workflow patterns
+
+### Quick Architecture Overview
+
+```mermaid
+graph TB
+    subgraph "User Interface"
+        CLI[Command Line Interface]
+    end
+    
+    subgraph "Application Layer"
+        MAIN[main.py - Single Agent]
+        FLOW[run_flow.py - Multi-Agent]
+        MCP[run_mcp.py - MCP Server]
+    end
+    
+    subgraph "Agent Layer"
+        MANUS[Manus Agent]
+        SWE[SWE Agent]
+        BROWSER[Browser Agent]
+        DATA[Data Analysis Agent]
+    end
+    
+    subgraph "Tool Layer"
+        PYTHON[Python Execute]
+        FILES[File Operations]
+        WEB[Web & Browser Tools]
+        CHARTS[Data Visualization]
+        MCP_TOOLS[MCP Tools]
+    end
+    
+    subgraph "Infrastructure"
+        LLM[LLM Providers]
+        CONFIG[Configuration]
+        SANDBOX[Sandbox Environment]
+    end
+    
+    CLI --> MAIN
+    CLI --> FLOW
+    CLI --> MCP
+    
+    MAIN --> MANUS
+    FLOW --> MANUS
+    FLOW --> SWE
+    FLOW --> BROWSER
+    FLOW --> DATA
+    
+    MANUS --> PYTHON
+    MANUS --> FILES
+    MANUS --> WEB
+    MANUS --> CHARTS
+    MANUS --> MCP_TOOLS
+    
+    PYTHON --> SANDBOX
+    FILES --> CONFIG
+    WEB --> LLM
+    CHARTS --> LLM
+    MCP_TOOLS --> LLM
+```
+
 ## How to contribute
 
 We welcome any friendly suggestions and helpful contributions! Just create issues or submit pull requests.
