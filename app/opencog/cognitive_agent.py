@@ -89,6 +89,8 @@ class CognitiveAgent(ToolCallAgent):
         # Initialize with basic knowledge if needed
         self._add_default_knowledge()
         
+        logger.info("OpenCog Cognitive Agent initialized with symbolic AI capabilities")
+        
         logger.info("Cognitive agent systems initialized")
     
     def _setup_tools(self):
@@ -389,3 +391,168 @@ class CognitiveAgent(ToolCallAgent):
         await super().cleanup()
         
         logger.info("Cognitive agent cleanup completed")
+    
+    def validate_knowledge_consistency(self) -> Dict[str, Any]:
+        """
+        Validate consistency of current knowledge base.
+        
+        Returns:
+            Dictionary with validation results and any inconsistencies found
+        """
+        try:
+            validation_results = {
+                "consistent": True,
+                "issues": [],
+                "statistics": {},
+                "recommendations": []
+            }
+            
+            # Basic statistics
+            stats = self.get_cognitive_status()
+            validation_results["statistics"] = stats
+            
+            # Check for circular inheritance
+            inheritance_links = self.atomspace.find_atoms_by_type("InheritanceLink")
+            circular_chains = []
+            
+            for link_id in inheritance_links:
+                link_atom = self.atomspace.get_atom(link_id)
+                if link_atom and len(link_atom.outgoing) == 2:
+                    child_id, parent_id = link_atom.outgoing
+                    
+                    # Simple cycle detection (could be enhanced)
+                    if self._has_inheritance_path(parent_id, child_id):
+                        child_atom = self.atomspace.get_atom(child_id)
+                        parent_atom = self.atomspace.get_atom(parent_id)
+                        if child_atom and parent_atom:
+                            circular_chains.append(f"{child_atom.name} -> {parent_atom.name}")
+            
+            if circular_chains:
+                validation_results["consistent"] = False
+                validation_results["issues"].append({
+                    "type": "circular_inheritance",
+                    "description": "Circular inheritance detected",
+                    "items": circular_chains
+                })
+            
+            # Check for conflicting truth values
+            concept_nodes = self.atomspace.find_atoms_by_type("ConceptNode")
+            low_confidence_items = []
+            
+            for atom_id in concept_nodes:
+                atom = self.atomspace.get_atom(atom_id)
+                if atom and atom.truth_value:
+                    confidence = atom.truth_value.get("confidence", 1.0)
+                    if confidence < 0.3:
+                        low_confidence_items.append(f"{atom.name} (conf: {confidence:.2f})")
+            
+            if low_confidence_items:
+                validation_results["recommendations"].append({
+                    "type": "low_confidence",
+                    "description": "Consider reviewing low-confidence items",
+                    "items": low_confidence_items[:5]  # Show first 5
+                })
+            
+            # Performance recommendations
+            if stats["total_atoms"] > 1000:
+                validation_results["recommendations"].append({
+                    "type": "performance", 
+                    "description": "Large knowledge base - consider periodic cleanup",
+                    "suggestion": "Use atomspace clear or export/import for optimization"
+                })
+            
+            return validation_results
+            
+        except Exception as e:
+            logger.error(f"Error validating knowledge consistency: {e}")
+            return {
+                "consistent": False,
+                "error": str(e),
+                "issues": [{"type": "validation_error", "description": str(e)}]
+            }
+    
+    def _has_inheritance_path(self, start_id: int, target_id: int, visited: Optional[set] = None) -> bool:
+        """Check if there's an inheritance path from start to target (for cycle detection)."""
+        if visited is None:
+            visited = set()
+        
+        if start_id in visited:
+            return False
+        
+        if start_id == target_id:
+            return True
+        
+        visited.add(start_id)
+        
+        # Find inheritance links where start_id is the child
+        incoming_links = self.atomspace.get_incoming(start_id)
+        for link_id in incoming_links:
+            link_atom = self.atomspace.get_atom(link_id)
+            if (link_atom and link_atom.type == "InheritanceLink" and 
+                len(link_atom.outgoing) == 2 and link_atom.outgoing[0] == start_id):
+                parent_id = link_atom.outgoing[1]
+                if self._has_inheritance_path(parent_id, target_id, visited.copy()):
+                    return True
+        
+        return False
+    
+    def generate_knowledge_insights(self) -> Dict[str, Any]:
+        """
+        Generate insights about the current knowledge base.
+        
+        Returns:
+            Dictionary with various insights and suggestions
+        """
+        try:
+            insights = {
+                "knowledge_graph_analysis": {},
+                "concept_rankings": [],
+                "knowledge_gaps": [],
+                "learning_suggestions": []
+            }
+            
+            # Analyze knowledge graph structure
+            concepts = self.atomspace.find_atoms_by_type("ConceptNode")
+            predicates = self.atomspace.find_atoms_by_type("PredicateNode")
+            
+            # Find most connected concepts
+            concept_connections = {}
+            for concept_id in concepts:
+                concept_atom = self.atomspace.get_atom(concept_id)
+                if concept_atom:
+                    incoming = len(self.atomspace.get_incoming(concept_id))
+                    outgoing = len(concept_atom.outgoing)
+                    total_connections = incoming + outgoing
+                    concept_connections[concept_atom.name] = total_connections
+            
+            # Sort by connectivity
+            sorted_concepts = sorted(concept_connections.items(), key=lambda x: x[1], reverse=True)
+            insights["concept_rankings"] = [
+                {"concept": name, "connections": count} 
+                for name, count in sorted_concepts[:10]
+            ]
+            
+            # Knowledge base maturity assessment
+            total_atoms = len(self.atomspace.atoms)
+            relationship_ratio = len(self.atomspace.find_atoms_by_type("InheritanceLink")) / max(len(concepts), 1)
+            
+            if total_atoms < 10:
+                maturity = "beginner"
+            elif total_atoms < 50:
+                maturity = "developing"  
+            elif total_atoms < 200:
+                maturity = "intermediate"
+            else:
+                maturity = "advanced"
+            
+            insights["knowledge_graph_analysis"]["maturity"] = {
+                "level": maturity,
+                "total_atoms": total_atoms,
+                "relationship_ratio": relationship_ratio
+            }
+            
+            return insights
+            
+        except Exception as e:
+            logger.error(f"Error generating knowledge insights: {e}")
+            return {"error": str(e)}
