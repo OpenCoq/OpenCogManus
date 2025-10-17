@@ -148,6 +148,19 @@ async def run_demonstration(agent):
     print(f"  - {status['evaluation_links']} facts")
     print(f"  - {status['reasoning_rules']} reasoning rules")
     
+    # Show some example atoms  
+    print("\n   Sample Knowledge Items:")
+    ai_atoms = agent.atomspace.find_atoms_by_name("Artificial Intelligence")
+    if ai_atoms:
+        ai_atom = agent.atomspace.get_atom(ai_atoms[0])
+        if ai_atom:
+            print(f"   - {ai_atom.type}: '{ai_atom.name}' (confidence: {ai_atom.truth_value.get('confidence', 1.0):.2f})")
+    
+    # Show reasoning insights
+    insights = agent._extract_reasoning_insights()
+    if insights:
+        print(f"\n   Reasoning Insights: {insights}")
+    
     # Demonstrate tool usage
     print("\n5. Using Cognitive Tools...")
     

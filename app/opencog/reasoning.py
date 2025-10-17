@@ -229,13 +229,56 @@ class ReasoningEngine(BaseModel):
     
     def _find_variable_bindings(self, premises: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Find all possible variable bindings for a set of premises."""
-        # Simplified implementation - extend for more complex patterns
         if not premises:
             return [{}]
         
-        # For now, return empty list for complex pattern matching
-        # In a full implementation, this would use sophisticated pattern matching
-        return []
+        # Start with first premise
+        first_premise = premises[0]
+        all_bindings = []
+        
+        # Find atoms that match the first premise
+        for atom_id, atom in self.atomspace.atoms.items():
+            if self._atom_matches_pattern(atom, first_premise):
+                # Extract variable bindings from this match
+                bindings = self._extract_variable_bindings(atom, first_premise)
+                if bindings is not None:
+                    # Check if these bindings work for all other premises
+                    if self._validate_bindings_for_premises(bindings, premises[1:]):
+                        all_bindings.append(bindings)
+        
+        return all_bindings
+    
+    def _extract_variable_bindings(self, atom: Atom, pattern: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Extract variable bindings from matching an atom against a pattern."""
+        bindings = {}
+        
+        # Check name binding
+        pattern_name = pattern.get("name")
+        if isinstance(pattern_name, str) and pattern_name.startswith("$"):
+            bindings[pattern_name] = atom.name
+        
+        # Check outgoing bindings
+        pattern_outgoing = pattern.get("outgoing", [])
+        if pattern_outgoing and len(atom.outgoing) >= len(pattern_outgoing):
+            for i, pattern_out in enumerate(pattern_outgoing):
+                if isinstance(pattern_out, str) and pattern_out.startswith("$"):
+                    if i < len(atom.outgoing):
+                        bindings[pattern_out] = atom.outgoing[i]
+        
+        return bindings
+    
+    def _validate_bindings_for_premises(self, bindings: Dict[str, Any], 
+                                      premises: List[Dict[str, Any]]) -> bool:
+        """Validate that bindings work for all remaining premises."""
+        for premise in premises:
+            # Instantiate premise with current bindings
+            instantiated = self._instantiate_pattern(premise, bindings)
+            
+            # Check if instantiated premise exists in atomspace
+            if not self._pattern_exists(instantiated):
+                return False
+        
+        return True
     
     def _pattern_matches(self, pattern1: Dict[str, Any], pattern2: Dict[str, Any]) -> bool:
         """Check if two patterns match (considering variables)."""
@@ -351,7 +394,34 @@ class ReasoningEngine(BaseModel):
     def _create_inference_from_rule(self, rule: Rule, 
                                    premise_results: List[InferenceResult]) -> Optional[InferenceResult]:
         """Create an inference result from applying a rule."""
-        # Simplified implementation
+        try:
+            # Extract variable bindings from premise results
+            bindings = {}
+            premise_ids = []
+            
+            for result in premise_results:
+                premise_ids.append(result.atom_id)
+                # Could extract more sophisticated bindings from result context
+            
+            # Instantiate conclusion with bindings
+            instantiated_conclusion = self._instantiate_pattern(rule.conclusion, bindings)
+            
+            # Create atom from conclusion
+            atom_id = self._create_atom_from_pattern(instantiated_conclusion)
+            
+            if atom_id:
+                # Calculate confidence
+                confidence = self._calculate_inference_confidence(rule.confidence, premise_ids)
+                
+                return InferenceResult(
+                    atom_id=atom_id,
+                    rule_name=rule.name,
+                    premises=premise_ids,
+                    confidence=confidence
+                )
+        except Exception as e:
+            logger.error(f"Error creating inference from rule {rule.name}: {e}")
+        
         return None
     
     def query_knowledge(self, query: str) -> List[Dict[str, Any]]:
